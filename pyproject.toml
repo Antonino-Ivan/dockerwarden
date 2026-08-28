@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dockerwarden"
+version = "1.0.0"
+description = "Analizza un Dockerfile e segnala ciò che romperà build, cache o sicurezza. Output SARIF per GitHub code scanning."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Antonino Ivan Iannì" }]
+keywords = ["docker", "dockerfile", "linter", "sarif", "security", "ci", "devops"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Quality Assurance",
+  "Topic :: Security",
+]
+
+# Nessuna dipendenza: il parser, le regole e la resa SARIF usano solo la stdlib.
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/Antonino-Ivan/dockerwarden"
+Issues = "https://github.com/Antonino-Ivan/dockerwarden/issues"
+
+[project.scripts]
+dockerwarden = "dockerwarden.cli:main"
+
+[tool.setuptools]
+packages = ["dockerwarden"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]

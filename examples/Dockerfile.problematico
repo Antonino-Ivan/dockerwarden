@@ -1,0 +1,25 @@
+# Dockerfile scritto male di proposito: quasi ogni regola trova qualcosa.
+FROM node:latest
+
+MAINTAINER qualcuno@esempio.invalid
+
+ENV DATABASE_PASSWORD=super-segreta-123
+ARG NPM_TOKEN=abcdef0123456789
+
+RUN apt-get update
+RUN apt-get install -y curl git build-essential
+RUN curl -fsSL https://esempio.invalid/installa.sh | sh
+RUN cd /app
+RUN chmod 777 /app
+RUN sudo mkdir -p /dati
+
+WORKDIR /app
+COPY . .
+RUN npm install
+RUN npm run build
+
+ADD ./config.json /app/config.json
+
+EXPOSE 8080 http
+
+CMD npm start

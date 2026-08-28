@@ -1,0 +1,36 @@
+# Stessa applicazione, scritta in modo che dockerwarden non abbia niente da dire.
+# Il digest è quello che rende la build riproducibile: il tag da solo può cambiare.
+FROM node:22.12.0-slim@sha256:8b4a29b4e0e0a6b31e5e58f2e8d6b1c5f6a9c3d2e1f0a9b8c7d6e5f4a3b2c1d0 AS build
+
+WORKDIR /app
+
+# Prima i soli file di dipendenze: il layer si ricostruisce solo quando cambia
+# il lockfile, non a ogni modifica del codice.
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build && npm prune --omit=dev
+
+FROM node:22.12.0-slim@sha256:8b4a29b4e0e0a6b31e5e58f2e8d6b1c5f6a9c3d2e1f0a9b8c7d6e5f4a3b2c1d0
+
+# Aggiornamento e installazione nello stesso layer, cache rimossa nello stesso
+# comando: altrimenti il livello precedente conserva comunque i file.
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y tini \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=build --chown=node:node /app/dist ./dist
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
+
+USER node
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
+    CMD ["node", "dist/healthcheck.js"]
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["node", "dist/server.js"]

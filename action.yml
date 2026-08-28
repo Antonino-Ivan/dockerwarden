@@ -1,0 +1,69 @@
+name: dockerwarden
+description: Analizza un Dockerfile e carica i risultati in GitHub code scanning come SARIF.
+author: Antonino Ivan Iannì
+
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  file:
+    description: Dockerfile da analizzare.
+    required: false
+    default: Dockerfile
+  context:
+    description: Cartella del contesto di build. Vuoto per usare quella del Dockerfile.
+    required: false
+    default: ""
+  fail-on:
+    description: Gravità che fa fallire il job (error, warning, note).
+    required: false
+    default: error
+  sarif:
+    description: Percorso del file SARIF da produrre. Vuoto per non produrlo.
+    required: false
+    default: dockerwarden.sarif
+  disable:
+    description: Codici di regola da disattivare, separati da virgola.
+    required: false
+    default: ""
+
+outputs:
+  sarif-file:
+    description: Percorso del SARIF prodotto, da passare a github/codeql-action/upload-sarif.
+    value: ${{ inputs.sarif }}
+
+runs:
+  using: composite
+  steps:
+    - name: Installa dockerwarden
+      shell: bash
+      run: python -m pip install --quiet "${{ github.action_path }}"
+
+    - name: Analizza
+      shell: bash
+      env:
+        FILE: ${{ inputs.file }}
+        CONTEXT: ${{ inputs.context }}
+        FAIL_ON: ${{ inputs.fail-on }}
+        SARIF: ${{ inputs.sarif }}
+        DISABLE: ${{ inputs.disable }}
+      run: |
+        args=(lint "$FILE" --fail-on "$FAIL_ON")
+        [ -n "$CONTEXT" ] && args+=(--context "$CONTEXT")
+        if [ -n "$DISABLE" ]; then
+          IFS=',' read -ra codes <<< "$DISABLE"
+          for code in "${codes[@]}"; do
+            args+=(--disable "$(echo "$code" | xargs)")
+          done
+        fi
+
+        # Una sola esecuzione: le annotazioni vanno sullo stdout del passo, il
+        # SARIF su file. Viene scritto anche quando l'analisi fallisce, perché è
+        # proprio il caso in cui code scanning deve riceverlo.
+        args+=(--annotate)
+        if [ -n "$SARIF" ]; then
+          args+=(--format sarif --output "$SARIF")
+        fi
+
+        dockerwarden "${args[@]}"

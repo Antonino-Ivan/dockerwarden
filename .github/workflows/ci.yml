@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test su Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Installa il pacchetto
+        run: python -m pip install --upgrade pip && python -m pip install -e .
+
+      - name: Test
+        run: python -m unittest discover -s tests -t . -v
+
+      - name: Il Dockerfile corretto deve passare
+        run: dockerwarden lint examples/Dockerfile.corretto
+
+      - name: Il Dockerfile problematico deve fallire
+        run: |
+          if dockerwarden lint examples/Dockerfile.problematico; then
+            echo "atteso exit != 0 sul Dockerfile problematico"
+            exit 1
+          fi
+
+      # Il SARIF prodotto viene riletto: uno schema rotto si scopre qui, non
+      # quando GitHub rifiuta silenziosamente l'upload.
+      - name: Il SARIF deve essere JSON valido
+        run: dockerwarden lint examples/Dockerfile.problematico -f sarif | python -c "import json,sys; d=json.load(sys.stdin); assert d['version']=='2.1.0'; print(len(d['runs'][0]['results']), 'risultati')"
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install ruff==0.14.5
+      - run: ruff check .
+      - run: ruff format --check .
